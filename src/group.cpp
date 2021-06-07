@@ -7,6 +7,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
+#include "dbg.h"
 
 const hParam   Param::NO_PARAM = { 0 };
 #define NO_PARAM (Param::NO_PARAM)
@@ -395,11 +396,24 @@ bool Group::IsForcedToMesh() const {
     return forceToMesh || IsForcedToMeshBySource();
 }
 
-std::string Group::DescriptionString() {
+std::string Group::DescriptionString() const {
     if(name.empty()) {
         return ssprintf("g%03x-%s", h.v, _("(unnamed)"));
     } else {
         return ssprintf("g%03x-%s", h.v, name.c_str());
+    }
+}
+
+std::string Group::TypeToString() const {
+    switch (type) {
+    case Type::DRAWING_3D: return "sketch-in-3d";
+    case Type::DRAWING_WORKPLANE: return "sketch-in-plane";
+    case Type::EXTRUDE: return "extrude";
+    case Type::LATHE: return "lathe";
+    case Type::ROTATE: return "rotate";
+    case Type::TRANSLATE: return "translate";
+    case Type::LINKED: return "linked";
+    default: return "unknown";
     }
 }
 
@@ -428,6 +442,7 @@ void Group::Generate(IdList<Entity,hEntity> *entity,
             return;
 
         case Type::DRAWING_WORKPLANE: {
+            dbp("Group.genWorkplane");
             Quaternion q;
             if(subtype == Subtype::WORKPLANE_BY_LINE_SEGMENTS) {
                 Vector u = SK.GetEntity(predef.entityB)->VectorGetNum();
@@ -452,6 +467,7 @@ void Group::Generate(IdList<Entity,hEntity> *entity,
             normal.group = h;
             normal.h = h.entity(1);
             entity->Add(&normal);
+            dump._Entity("  normal", &normal);
 
             Entity point = {};
             point.type = Entity::Type::POINT_N_COPY;
@@ -460,6 +476,7 @@ void Group::Generate(IdList<Entity,hEntity> *entity,
             point.group = h;
             point.h = h.entity(2);
             entity->Add(&point);
+            dump._Entity("  point", &point);
 
             Entity wp = {};
             wp.type = Entity::Type::WORKPLANE;
@@ -472,6 +489,8 @@ void Group::Generate(IdList<Entity,hEntity> *entity,
         }
 
         case Type::EXTRUDE: {
+            dbp("Group.genExtrude");
+            dump._EntityList("  entity", entity);
             AddParam(param, h.param(0), gn.x);
             AddParam(param, h.param(1), gn.y);
             AddParam(param, h.param(2), gn.z);
@@ -513,6 +532,8 @@ void Group::Generate(IdList<Entity,hEntity> *entity,
         }
 
         case Type::LATHE: {
+            dbp("Group.genLathe");
+            dump._EntityList("  entity", entity);
             Vector axis_pos = SK.GetEntity(predef.origin)->PointGetNum();
             Vector axis_dir = SK.GetEntity(predef.entityB)->VectorGetNum();
 
@@ -673,6 +694,8 @@ void Group::Generate(IdList<Entity,hEntity> *entity,
         }
 
         case Type::TRANSLATE: {
+            dbp("Group.GenTranslate");
+            dump._EntityList("  entity", entity);
             // inherit meshCombine from source group
             Group *srcg = SK.GetGroup(opA);
             meshCombine = srcg->meshCombine;
@@ -704,6 +727,8 @@ void Group::Generate(IdList<Entity,hEntity> *entity,
             return;
         }
         case Type::ROTATE: {
+            dbp("Group.GenRotate");
+            dump._EntityList("  entity", entity);
             // inherit meshCombine from source group
             Group *srcg = SK.GetGroup(opA);
             meshCombine = srcg->meshCombine;
@@ -740,6 +765,8 @@ void Group::Generate(IdList<Entity,hEntity> *entity,
             return;
         }
         case Type::LINKED:
+            dbp("Group.GenLinked");
+            dump._EntityList("  entity", entity);
             // The translation vector
             AddParam(param, h.param(0), gp.x);
             AddParam(param, h.param(1), gp.y);
@@ -874,7 +901,9 @@ void Group::MakeExtrusionLines(IdList<Entity,hEntity> *el, hEntity in) {
 }
 
 void Group::MakeLatheCircles(IdList<Entity,hEntity> *el, IdList<Param,hParam> *param, hEntity in, Vector pt, Vector axis) {
+    dbp("MakeLatheCircles");
     Entity *ep = SK.GetEntity(in);
+    dump._Entity("  ep", ep);
 
     Entity en = {};
     if(ep->IsPoint()) {
@@ -886,10 +915,15 @@ void Group::MakeLatheCircles(IdList<Entity,hEntity> *el, IdList<Param,hParam> *p
         // Get arc center and point on arc.
         Entity *pc = SK.GetEntity(en.point[0]);
         Entity *pp = SK.GetEntity(en.point[1]);
+        dump._Entity("  pc", pc);
+        dump._Entity("  pp", pp);
 
         // Project arc point to the revolution axis and use it for arc center.
         double k = pp->numPoint.Minus(pt).Dot(axis) / axis.Dot(axis);
+        dbp("  k=%.4f", k);
         pc->numPoint = pt.Plus(axis.ScaledBy(k));
+        dump._Vector("  pc.numPoint", &pc->numPoint);
+        dump._Vector("  pp.numPoint", &pp->numPoint);
 
         // Create arc entity.
         en.group = h;
@@ -910,13 +944,17 @@ void Group::MakeLatheCircles(IdList<Entity,hEntity> *el, IdList<Param,hParam> *p
         Vector nu = pp->numPoint.Minus(pc->numPoint).WithMagnitude(1.0);
         Vector nv = nu.Cross(axis).WithMagnitude(1.0);
         n.numNormal = Quaternion::From(nv, nu);
+        dump._Vector("  nu", &nu);
+        dump._Vector("  nv", &nv);
 
         // The point determines where the normal gets displayed on-screen;
         // it's entirely cosmetic.
         n.point[0] = en.point[0];
         el->Add(&n);
+        dump._Entity("  n", &n);
         en.normal = n.h;
         el->Add(&en);
+        dump._Entity("  en", &en);
     }
 }
 
@@ -1024,6 +1062,9 @@ void Group::CopyEntity(IdList<Entity,hEntity> *el,
                        hParam qw, hParam qvx, hParam qvy, hParam qvz, hParam dist,
                        CopyAs as)
 {
+    dbp("CopyEntity");
+    dump._Entity("  ep", ep);
+
     Entity en = {};
     en.type = ep->type;
     en.extraPoints = ep->extraPoints;
@@ -1168,7 +1209,7 @@ void Group::CopyEntity(IdList<Entity,hEntity> *el,
     // came from a copy (e.g. step and repeat) of a force-hidden linked
     // entity, then we also want to hide it.
     en.forceHidden = (!ep->actVisible) || ep->forceHidden;
-
+    dump._Entity("  en", &en);
     el->Add(&en);
 }
 

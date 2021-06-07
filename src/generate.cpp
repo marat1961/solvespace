@@ -7,6 +7,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
+#include "dbg.h"
 
 void SolveSpaceUI::MarkGroupDirtyByEntity(hEntity he) {
     Entity *e = SK.GetEntity(he);
@@ -255,6 +256,7 @@ void SolveSpaceUI::GenerateAll(Generate type, bool andFindFree, bool genForBBox)
                 newp->free = prevp->free;
             }
         }
+        dump._Params("SK.param", &SK.param);
 
         if(hg == Group::HGROUP_REFERENCES) {
             ForceReferences();

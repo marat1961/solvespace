@@ -8,6 +8,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
+#include "dbg.h"
 
 // Dot product tolerance for perpendicular; this is on the direction cosine,
 // so it's about 0.001 degrees.
@@ -461,11 +462,15 @@ bool SShell::ClassifyEdge(Class *indir, Class *outdir,
         }
     }
 
+    dbp("Edge intersections %d", edge_inters);
     if(edge_inters == 2) {
         //! @todo make this use the appropriate curved normals
         double dotp[2];
         for(int i = 0; i < 2; i++) {
             dotp[i] = edge_n_out.DirectionCosineWith(inter_surf_n[i]);
+            dbp("  [%d] surf_n(%.4f, %.4f, %.4f) edge_n(%.4f, %.4f, %.4f) dotp=%.4f",
+                i, inter_surf_n[i].x, inter_surf_n[i].y, inter_surf_n[i].z,
+                   inter_edge_n[i].x, inter_edge_n[i].y, inter_edge_n[i].z, dotp[i]);
         }
 
         if(fabs(dotp[1]) < DOTP_TOL) {
@@ -551,6 +556,7 @@ bool SShell::ClassifyEdge(Class *indir, Class *outdir,
         // the point lies on a surface, but use only one side for in/out
         // testing)
         Vector ray = Vector::From(Random[cnt], Random[cnt+1], Random[cnt+2]);
+        dump._Vector("  ray", &ray);
 
         AllPointsIntersecting(
             p.Minus(ray), p.Plus(ray), &l,

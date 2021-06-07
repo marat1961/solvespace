@@ -148,6 +148,7 @@ set(solvespace_core_HEADERS
     polygon.h
     sketch.h
     solvespace.h
+    dbg.h
     ui.h
     platform/platform.h
     render/render.h
@@ -164,6 +165,7 @@ set(solvespace_core_SOURCES
     draw.cpp
     drawconstraint.cpp
     drawentity.cpp
+    dbg.cpp
     entity.cpp
     export.cpp
     exportstep.cpp

@@ -259,7 +259,8 @@ public:
 
 
     void Activate();
-    std::string DescriptionString();
+    std::string DescriptionString() const;
+    std::string Group::TypeToString() const;
     void Clear();
 
     static void AddParam(ParamList *param, hParam hp, double v);
@@ -586,6 +587,7 @@ public:
     void CalculateNumerical(bool forExport);
 
     std::string DescriptionString() const;
+    std::string TypeToString() const;
 
     void Clear() {
         beziers.l.Clear();

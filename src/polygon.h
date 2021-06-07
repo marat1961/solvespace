@@ -42,7 +42,10 @@ public:
     Vector a, b;
 
     static SEdge From(Vector a, Vector b);
-    bool EdgeCrosses(Vector a, Vector b, Vector *pi=NULL, SPointList *spl=NULL) const;
+    double Length() const {
+        return a.Minus(b).Magnitude();
+    }
+    bool EdgeCrosses(Vector a, Vector b, Vector* pi = NULL, SPointList* spl = NULL) const;
 };
 
 class SEdgeList {

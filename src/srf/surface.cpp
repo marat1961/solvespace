@@ -5,6 +5,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "../solvespace.h"
+#include "../dbg.h"
 
 SSurface SSurface::FromExtrusionOf(SBezier *sb, Vector t0, Vector t1) {
     SSurface ret = {};
@@ -280,6 +281,8 @@ void SSurface::MakeEdgesInto(SShell *shell, SEdgeList *sel, MakeAs flags,
         }
 
         MakeTrimEdgesInto(sel, flags, sc, stb);
+        dump._Curve("Surface.MakeEdgesInto", sc);
+        dump._Edges("  sel", sel);
     }
 }
 
@@ -501,6 +504,9 @@ void SShell::MakeFromExtrusionOf(SBezierLoopSet *sbls, Vector t0, Vector t1, Rgb
     if((t0.Minus(t1)).Dot(sbls->normal) < 0) {
         swap(t0, t1);
     }
+    dbp("Shell.MakeFromExtrusionOf");
+    dump._Vector("  t0", &t0);
+    dump._Vector("  t1", &t1);
 
     // Define a coordinate system to contain the original sketch, and get
     // a bounding box in that csys
@@ -508,6 +514,11 @@ void SShell::MakeFromExtrusionOf(SBezierLoopSet *sbls, Vector t0, Vector t1, Rgb
     Vector u = n.Normal(0), v = n.Normal(1);
     Vector orig = sbls->point;
     double umax = VERY_NEGATIVE, umin = VERY_POSITIVE;
+    dump._Vector("  n", &n);
+    dump._Vector("  u", &u);
+    dump._Vector("  v", &v);
+    dump._Vector("  orig", &orig);
+
     sbls->GetBoundingProjd(u, orig, &umin, &umax);
     double vmax = VERY_NEGATIVE, vmin = VERY_POSITIVE;
     sbls->GetBoundingProjd(v, orig, &vmin, &vmax);
@@ -516,6 +527,9 @@ void SShell::MakeFromExtrusionOf(SBezierLoopSet *sbls, Vector t0, Vector t1, Rgb
     orig = orig.Plus(v.ScaledBy(vmin));
     u = u.ScaledBy(umax - umin);
     v = v.ScaledBy(vmax - vmin);
+    dump._Vector("  u", &u);
+    dump._Vector("  v", &v);
+    dump._Vector("  orig", &orig);
 
     // So we can now generate the top and bottom surfaces of the extrusion,
     // planes within a translated (and maybe mirrored) version of that csys.
@@ -526,21 +540,27 @@ void SShell::MakeFromExtrusionOf(SBezierLoopSet *sbls, Vector t0, Vector t1, Rgb
     s1.color = color;
     hSSurface hs0 = surface.AddAndAssignId(&s0),
               hs1 = surface.AddAndAssignId(&s1);
+    dump._Surface("Surface s0", &s0);
+    dump._Surface("Surface s1", &s1);
 
     // Now go through the input curves. For each one, generate its surface
     // of extrusion, its two translated trim curves, and one trim line. We
     // go through by loops so that we can assign the lines correctly.
+    dbp("Loops=%d", sbls->l.n);
     SBezierLoop *sbl;
+    int ii = 0;
     for(sbl = sbls->l.First(); sbl; sbl = sbls->l.NextAfter(sbl)) {
         SBezier *sb;
+        dbp("Bezier in loop=%d", sbl->l.n);
         List<TrimLine> trimLines = {};
-
+        int jj = 0;
         for(sb = sbl->l.First(); sb; sb = sbl->l.NextAfter(sb)) {
             // Generate the surface of extrusion of this curve, and add
             // it to the list
             SSurface ss = SSurface::FromExtrusionOf(sb, t0, t1);
             ss.color = color;
             hSSurface hsext = surface.AddAndAssignId(&ss);
+            dump._Surface(ssprintf("Surface[%d, %d]", ii, jj++).c_str(), &ss);
 
             // Translate the curve by t0 and t1 to produce two trim curves
             SCurve sc = {};
@@ -550,6 +570,7 @@ void SShell::MakeFromExtrusionOf(SBezierLoopSet *sbls, Vector t0, Vector t1, Rgb
             sc.surfA = hs0;
             sc.surfB = hsext;
             hSCurve hc0 = curve.AddAndAssignId(&sc);
+            dump._Curve("  Curve t0", &sc);
 
             sc = {};
             sc.isExact = true;
@@ -558,6 +579,7 @@ void SShell::MakeFromExtrusionOf(SBezierLoopSet *sbls, Vector t0, Vector t1, Rgb
             sc.surfA = hs1;
             sc.surfB = hsext;
             hSCurve hc1 = curve.AddAndAssignId(&sc);
+            dump._Curve("  Curve t1", &sc);
 
             STrimBy stb0, stb1;
             // The translated curves trim the flat top and bottom surfaces.
@@ -565,12 +587,18 @@ void SShell::MakeFromExtrusionOf(SBezierLoopSet *sbls, Vector t0, Vector t1, Rgb
             stb1 = STrimBy::EntireCurve(this, hc1, /*backwards=*/true);
             (surface.FindById(hs0))->trim.Add(&stb0);
             (surface.FindById(hs1))->trim.Add(&stb1);
+            dbp("boundary curves for top and bottom surface");
+            dump._TrimBy("  stb0", &stb0);
+            dump._TrimBy("  stb1", &stb1);
 
             // The translated curves also trim the surface of extrusion.
             stb0 = STrimBy::EntireCurve(this, hc0, /*backwards=*/true);
             stb1 = STrimBy::EntireCurve(this, hc1, /*backwards=*/false);
             (surface.FindById(hsext))->trim.Add(&stb0);
             (surface.FindById(hsext))->trim.Add(&stb1);
+            dbp("extrusion boundary curves");
+            dump._TrimBy("  stb0", &stb0);
+            dump._TrimBy("  stb1", &stb1);
 
             // And form the trim line
             Vector pt = sb->Finish();
@@ -583,8 +611,10 @@ void SShell::MakeFromExtrusionOf(SBezierLoopSet *sbls, Vector t0, Vector t1, Rgb
             TrimLine tl;
             tl.hc = hl;
             tl.hs = hsext;
+            dump._Curve("  Curve tl", &sc);
             trimLines.Add(&tl);
         }
+        ii++;
 
         int i;
         for(i = 0; i < trimLines.n; i++) {

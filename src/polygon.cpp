@@ -4,6 +4,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
+#include "dbg.h"
 
 Vector STriangle::Normal() const {
     Vector ab = b.Minus(a), bc = c.Minus(b);
@@ -146,6 +147,11 @@ bool SEdge::EdgeCrosses(Vector ea, Vector eb, Vector *ppi, SPointList *spl) cons
     if((ea.Equals(a) && eb.Equals(b)) ||
        (eb.Equals(a) && ea.Equals(b)))
     {
+        dbp("EdgeCrosses equals");
+        dump._Vector(" ea", &ea);
+        dump._Vector(" eb", &eb);
+        dump._Vector(" a", &a);
+        dump._Vector(" b", &b);
         if(ppi) *ppi = a;
         if(spl) spl->Add(a);
         return true;
@@ -174,6 +180,11 @@ bool SEdge::EdgeCrosses(Vector ea, Vector eb, Vector *ppi, SPointList *spl) cons
         if(t > tthis_eps && t < (1 - tthis_eps)) inters = true;
 
         if(inters) {
+            dbp("EdgeCrosses 1");
+            dump._Vector(" ea", &ea);
+            dump._Vector(" eb", &eb);
+            dump._Vector(" a", &a);
+            dump._Vector(" b", &b);
             if(ppi) *ppi = a;
             if(spl) spl->Add(a);
             return true;
@@ -204,6 +215,11 @@ bool SEdge::EdgeCrosses(Vector ea, Vector eb, Vector *ppi, SPointList *spl) cons
         // vertex).
         if(ppi) *ppi = pi;
         if(spl) spl->Add(pi);
+        dbp("EdgeCrosses 2");
+        dump._Vector(" ea", &ea);
+        dump._Vector(" eb", &eb);
+        dump._Vector(" a", &a);
+        dump._Vector(" b", &b);
         return true;
     }
     return false;
@@ -702,6 +718,7 @@ size_t SPolygon::WindingNumberForPoint(Vector p) const {
 }
 
 void SPolygon::FixContourDirections() {
+    dbp("FixContourDirections Count=%d", l.n);
     // At output, the contour's tag will be 1 if we reversed it, else 0.
     l.ClearTags();
 
@@ -723,6 +740,7 @@ void SPolygon::FixContourDirections() {
             if(sct->ContainsPointProjdToNormal(normal, pt)) {
                 outer = !outer;
                 (sc->timesEnclosed)++;
+                dbp("  outer[i=%d, j=%d]=%d", i, j, outer);
             }
         }
 
@@ -730,6 +748,7 @@ void SPolygon::FixContourDirections() {
         if((clockwise && outer) || (!clockwise && !outer)) {
             sc->Reverse();
             sc->tag = 1;
+            dbp("  [i=%d] clockwise=%d outer=%d Reverse", i, clockwise, outer);
         }
     }
 }

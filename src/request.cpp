@@ -7,6 +7,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
+#include "dbg.h"
 
 const hRequest Request::HREQUEST_REFERENCE_XY = { 1 };
 const hRequest Request::HREQUEST_REFERENCE_YZ = { 2 };
@@ -81,6 +82,7 @@ Request::Type EntReqTable::GetRequestForEntity(Entity::Type ent) {
 void Request::Generate(IdList<Entity,hEntity> *entity,
                        IdList<Param,hParam> *param)
 {
+    dump._Request("Request.Generate", this);
     int points = 0;
     Entity::Type et = (Entity::Type)0;
     bool hasNormal = false;
@@ -139,6 +141,9 @@ void Request::Generate(IdList<Entity,hEntity> *entity,
 
     // And generate entities for the points
     for(i = 0; i < points; i++) {
+       if (i == 0) {
+          dbp("generate entities for the points");
+        }
         Entity p = {};
         p.workplane = workplane;
         // points start from entity 1, except for datum point case
@@ -160,6 +165,7 @@ void Request::Generate(IdList<Entity,hEntity> *entity,
         }
         entity->Add(&p);
         e.point[i] = p.h;
+        dump._Entity("  p", &p);
     }
     if(hasNormal) {
         Entity n = {};
@@ -185,6 +191,7 @@ void Request::Generate(IdList<Entity,hEntity> *entity,
         n.point[0] = e.point[0];
         entity->Add(&n);
         e.normal = n.h;
+        dump._Entity("  n", &n);
     }
     if(hasDistance) {
         Entity d = {};
@@ -196,9 +203,12 @@ void Request::Generate(IdList<Entity,hEntity> *entity,
         d.param[0] = AddParam(param, h.param(64));
         entity->Add(&d);
         e.distance = d.h;
+        dump._Entity("  d", &d);
     }
-
-    if(et != (Entity::Type)0) entity->Add(&e);
+    if(et != (Entity::Type)0) {
+        entity->Add(&e);
+        dump._Entity("  e", &e);
+    }
 }
 
 std::string Request::DescriptionString() const {

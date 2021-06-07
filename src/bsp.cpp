@@ -7,25 +7,33 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
+#include "polygon.h"
+#include "dbg.h"
 
 SBsp2 *SBsp2::Alloc() { return (SBsp2 *)AllocTemporary(sizeof(SBsp2)); }
 SBsp3 *SBsp3::Alloc() { return (SBsp3 *)AllocTemporary(sizeof(SBsp3)); }
 
-SBsp3 *SBsp3::FromMesh(const SMesh *m) {
-    SMesh mc = {};
-    for(auto const &elt : m->l) { mc.AddTriangle(&elt); }
-
-    srand(0); // Let's be deterministic, at least!
-    int n = mc.l.n;
-    while(n > 1) {
-        int k = rand() % n;
-        n--;
-        swap(mc.l[k], mc.l[n]);
+SBsp3* SBsp3::FromMesh(const SMesh* m) {
+    SBsp3* bsp3 = NULL;
+    int i, cnt = m->l.n;
+    std::vector<int> mc = {};
+    for (i = 0; i < cnt; i++) {
+        mc.push_back(i);
     }
 
-    SBsp3 *bsp3 = NULL;
-    for(auto &elt : mc.l) { bsp3 = InsertOrCreate(bsp3, &elt, NULL); }
-    mc.Clear();
+    SRandom::Seed(0); // Let's be deterministic, at least!
+    int n = cnt;
+    while (n > 1) {
+        int k = SRandom::Int(n);
+        n--;
+        swap(mc[k], mc[n]);
+    }
+
+    STriangle* tr;
+    for (i = 0; i < cnt; i++) {
+        tr = const_cast<STriangle*>(&m->l.Get(mc[i]));
+        bsp3 = InsertOrCreate(bsp3, tr, NULL);
+    }
     return bsp3;
 }
 
@@ -183,6 +191,8 @@ public:
     }
 
     void ClassifyTriangle(STriangle *tri, SBsp3 *node) {
+        if (dump.bspon)
+            dump._Triangle("ClassifyTriangle", tri);
         tr   = tri;
         bsp  = node;
         onc  = 0;
@@ -206,9 +216,13 @@ public:
                 isOn[i] = true;
             }
         }
+        if (dump.bspon)
+            dbp("pos=%d neg=%d on=%d", posc, negc, onc);
     }
 
     bool ClassifyConvex(Vector *vertex, size_t cnt, SBsp3 *node, bool insertEdge) {
+        if (dump.bspon)
+            dbp("ClassifyConvex cnt=%d", cnt);
         bsp  = node;
         onc  = 0;
         posc = 0;
@@ -242,6 +256,8 @@ public:
                 Vector e12 = (vertex[2]).Minus(vertex[1]);
                 Vector out = e01.Cross(e12);
                 SEdge se = SEdge::From(on[0], on[1]);
+                if (dump.bspon)
+                    dump._Edge("se", &se);
                 bsp->edges = SBsp2::InsertOrCreateEdge(bsp->edges, &se, bsp->n, out);
             }
         }
@@ -249,6 +265,8 @@ public:
     }
 
     bool ClassifyConvexVertices(Vector *vertex, size_t cnt, bool insertEdges) {
+        if (dump.bspon)
+            dbp("ClassifyConvexVertices cnt=%d", cnt);
         Vector inter[2];
         int inters = 0;
 
@@ -276,11 +294,19 @@ public:
                 vpos[npos++] = vi;
                 vneg[nneg++] = vi;
 
-                if(inters >= 2) return false; // triangulate: XXX shouldn't happen but does
+                if (inters >= 2) {
+                    dbp("ClassifyConvexVertices: inters >= 2");
+                    return false; // triangulate: XXX shouldn't happen but does
+                }
                 inter[inters++] = vi;
             }
         }
-        ssassert(npos <= cnt + 1 && nneg <= cnt + 1, "Impossible");
+        if (dump.bspon)
+            dbp("inters=%d pos=%d neg=%d", inters, npos, nneg);
+        bool check = npos <= cnt + 1 && nneg <= cnt + 1;
+        ssassert(check, "Impossible");
+        if (check)
+            dbp("Impossible");
 
         if(insertEdges) {
             Vector e01 = (vertex[1]).Minus(vertex[0]);
@@ -462,6 +488,12 @@ SBsp3 *SBsp3::InsertOrCreate(SBsp3 *where, STriangle *tr, SMesh *instead) {
 }
 
 void SBsp3::Insert(STriangle *tr, SMesh *instead) {
+    if (dump.tr) {
+        if ((dump.trn >= 480) && (dump.trn <= 490))
+            dump.bspon = true;
+        else
+            dump.bspon = false;
+    }
     BspUtil *u = BspUtil::Alloc();
     u->ClassifyTriangle(tr, this);
 

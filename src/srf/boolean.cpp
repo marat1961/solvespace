@@ -5,6 +5,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
+#include "dbg.h"
 
 static int I;
 
@@ -144,7 +145,7 @@ SCurve SCurve::MakeCopySplitAgainst(SShell *agnstA, SShell *agnstB,
                 // We're keeping the intersection, so actually refine it. Finding the intersection
                 // to within EPS is important to match the ends of different chopped trim curves.
                 // The general 3-surface intersection fails to refine for trims where surfaces
-                // are tangent at the curve, but those trims are usually exact, soâ€¦
+                // are tangent at the curve, but those trims are usually exact, so…
                 if(isExact) {
                     (pi->srf)->PointOnCurve(&exact, &(puv.x), &(puv.y));
                 } else {
@@ -378,13 +379,16 @@ void SSurface::FindChainAvoiding(SEdgeList *src, SEdgeList *dest,
     src->l.ClearTags();
     src->l.First()->tag = 1;
 
+    dump._Edge("  First", src->l.First());
+    dump._Edges("  dest", dest);
     bool added;
     do {
         added = false;
         // The start and finish of the current edge chain
         Vector s = dest->l.First()->a,
                f = dest->l.Last()->b;
-
+        dump._Vector("  s", &s);
+        dump._Vector("  f", &s);
         // We can attach a new edge at the start or finish, as long as that
         // start or finish point isn't in the list of points to avoid.
         bool startOkay  = !avoid->ContainsPoint(s),
@@ -400,11 +404,15 @@ void SSurface::FindChainAvoiding(SEdgeList *src, SEdgeList *dest,
                 s = se->a;
                 se->tag = 1;
                 startOkay = !avoid->ContainsPoint(s);
+                dump._Edge("  AddToBeginning", se);
+                dump._Edges("  dest", dest);
             } else if(finishOkay && f.Equals(se->a)) {
                 dest->l.Add(se);
                 f = se->b;
                 se->tag = 1;
                 finishOkay = !avoid->ContainsPoint(f);
+                dump._Edge("  AddToEnd", se);
+                dump._Edges("  dest", dest);
             } else {
                 continue;
             }
@@ -423,6 +431,8 @@ void SSurface::EdgeNormalsWithinSurface(Point2d auv, Point2d buv,
                                         uint32_t auxA,
                                         SShell *shell, SShell *sha, SShell *shb)
 {
+    dbp("EdgeNormalsWithinSurface auv(x=%.4f, y=%.4f) buv(x=%.4f, y=%.4f) auxA=%08x",
+                                  auv.x, auv.y, buv.x, buv.y, auxA);
     // the midpoint of the edge
     Point2d muv  = (auv.Plus(buv)).ScaledBy(0.5);
 
@@ -472,6 +482,10 @@ void SSurface::EdgeNormalsWithinSurface(Point2d auv, Point2d buv,
            pout  = PointAt(muv.Plus(enuv));
     *enin  = pin.Minus(*pt),
     *enout = pout.Minus(*pt);
+    dump._Vector("  pt", pt);
+    dump._Vector("  enin", enin);
+    dump._Vector("  enout", enout);
+    dump._Vector("  surfn", surfn);
 }
 
 //-----------------------------------------------------------------------------
@@ -486,6 +500,7 @@ SSurface SSurface::MakeCopyTrimAgainst(SShell *parent,
                                        SSurface::CombineAs type,
                                        int dbg_index)
 {
+    dbp("Surface.MakeCopyTrimAgainst");
     bool opA = (parent == sha);
     SShell *agnst = opA ? shb : sha;
 
@@ -507,6 +522,7 @@ SSurface SSurface::MakeCopyTrimAgainst(SShell *parent,
         // The second operand of a Boolean difference gets turned inside out
         ret.Reverse();
     }
+    dump._TrimByList("  trim", &ret.trim);
 
     // Build up our original trim polygon; remember the coordinates could
     // be changed if we just flipped the surface normal, and we are using
@@ -590,6 +606,7 @@ SSurface SSurface::MakeCopyTrimAgainst(SShell *parent,
         }
     }
     choosing.l.RemoveTagged();
+    dump._Points("  choosing", &choosing);
 
     // The list of edges to trim our new surface, a combination of edges from
     // our original and intersecting edge lists.
@@ -597,7 +614,9 @@ SSurface SSurface::MakeCopyTrimAgainst(SShell *parent,
 
     while(!orig.l.IsEmpty()) {
         SEdgeList chain = {};
+        dump._Edges("  orig", &orig);
         FindChainAvoiding(&orig, &chain, &choosing);
+        dump._Edges("  chain", &chain);
 
         // Arbitrarily choose an edge within the chain to classify; they
         // should all be the same, though.
@@ -615,9 +634,14 @@ SSurface SSurface::MakeCopyTrimAgainst(SShell *parent,
         indir_orig  = SShell::Class::INSIDE;
         outdir_orig = SShell::Class::OUTSIDE;
 
-        agnst->ClassifyEdge(&indir_shell, &outdir_shell,
+        bool ok = agnst->ClassifyEdge(&indir_shell, &outdir_shell,
                             ret.PointAt(auv), ret.PointAt(buv), pt,
                             enin, enout, surfn);
+        if (ok)
+            dbp("ClassifyEdge indir=%s outdir=%s",
+                dump._ShellKind(indir_shell), dump._ShellKind(outdir_shell));
+        else
+            dbp("ClassifyEdge failed");
 
         if(KeepEdge(type, opA, indir_shell, outdir_shell,
                                indir_orig,  outdir_orig))
@@ -628,6 +652,7 @@ SSurface SSurface::MakeCopyTrimAgainst(SShell *parent,
         }
         chain.Clear();
     }
+    dump._Edges("  final 1", &final);
 
     while(!inter.l.IsEmpty()) {
         SEdgeList chain = {};
@@ -648,9 +673,14 @@ SSurface SSurface::MakeCopyTrimAgainst(SShell *parent,
         SBspUv::Class c_this = (origBsp) ? origBsp->ClassifyEdge(auv, buv, &ret) : SBspUv::Class::OUTSIDE;
         TagByClassifiedEdge(c_this, &indir_orig, &outdir_orig);
 
-        agnst->ClassifyEdge(&indir_shell, &outdir_shell,
+        bool ok = agnst->ClassifyEdge(&indir_shell, &outdir_shell,
                             ret.PointAt(auv), ret.PointAt(buv), pt,
                             enin, enout, surfn);
+        if (ok)
+            dbp("ClassifyEdge indir=%s outdir=%s",
+                dump._ShellKind(indir_shell), dump._ShellKind(outdir_shell));
+        else
+            dbp("ClassifyEdge failed");
 
         if(KeepEdge(type, opA, indir_shell, outdir_shell,
                                indir_orig,  outdir_orig))
@@ -661,12 +691,14 @@ SSurface SSurface::MakeCopyTrimAgainst(SShell *parent,
         }
         chain.Clear();
     }
+    dump._Edges("  final 2", &final);
 
     // Cull extraneous edges; duplicates or anti-parallel pairs. In particular,
     // we can get duplicate edges if our surface intersects the other shell
     // at an edge, so that both surfaces intersect coincident (and both
     // generate an intersection edge).
     final.CullExtraneousEdges(/*both=*/true);
+    dump._Edges("  final", &final);
 
     // Use our reassembled edges to trim the new surface.
     ret.TrimFromEdgeList(&final, /*asUv=*/true);
@@ -790,6 +822,7 @@ void SShell::MakeFromAssemblyOf(SShell *a, SShell *b) {
 }
 
 void SShell::MakeFromBoolean(SShell *a, SShell *b, SSurface::CombineAs type) {
+    dump._MakeFromBoolean("Shell.MakeFromBoolean", a, b, this, type);
     booleanFailed = false;
 
     a->MakeClassifyingBsps(NULL);
@@ -799,11 +832,14 @@ void SShell::MakeFromBoolean(SShell *a, SShell *b, SSurface::CombineAs type) {
     // piecwise linear segment never crosses a surface from the other
     // shell.
     a->CopyCurvesSplitAgainst(/*opA=*/true,  b, this);
+    dump._Shell("Shell CopyCurvesSplitAgainst ab", this);
     b->CopyCurvesSplitAgainst(/*opA=*/false, a, this);
+    dump._Shell("Shell CopyCurvesSplitAgainst ba", this);
 
     // Generate the intersection curves for each surface in A against all
     // the surfaces in B (which is all of the intersection curves).
     a->MakeIntersectionCurvesAgainst(b, this);
+    dump._Shell("Shell MakeIntersectionCurvesAgainst", this);
 
     for(SCurve &sc : curve) {
         SSurface *srfA = sc.GetSurfaceA(a, b),
@@ -814,7 +850,9 @@ void SShell::MakeFromBoolean(SShell *a, SShell *b, SSurface::CombineAs type) {
 
     // And clean up the piecewise linear things we made as a calculation aid
     a->CleanupAfterBoolean();
+    dump._Shell("Shell a.CleanupAfterBoolean", a);
     b->CleanupAfterBoolean();
+    dump._Shell("Shell b.CleanupAfterBoolean", b);
     // Remake the classifying BSPs with the split (and short-segment-removed)
     // curves
     a->MakeClassifyingBsps(this);
@@ -828,6 +866,7 @@ void SShell::MakeFromBoolean(SShell *a, SShell *b, SSurface::CombineAs type) {
     // Then trim and copy the surfaces
     a->CopySurfacesTrimAgainst(a, b, this, type);
     b->CopySurfacesTrimAgainst(a, b, this, type);
+    dump._Shell("  CopySurfacesTrimAgainst", this);
 
     // Now that we've copied the surfaces, we know their new hSurfaces, so
     // rewrite the curves to refer to the surfaces by their handles in the
@@ -837,13 +876,14 @@ void SShell::MakeFromBoolean(SShell *a, SShell *b, SSurface::CombineAs type) {
     // And clean up the piecewise linear things we made as a calculation aid
     a->CleanupAfterBoolean();
     b->CleanupAfterBoolean();
+    dump._Shell("  result", this);
 }
 
 //-----------------------------------------------------------------------------
 // All of the BSP routines that we use to perform and accelerate polygon ops.
 //-----------------------------------------------------------------------------
 void SShell::MakeClassifyingBsps(SShell *useCurvesFrom) {
-#pragma omp parallel for
+ #pragma omp parallel for
     for(int i = 0; i<surface.n; i++) {
         surface[i].MakeClassifyingBsp(this, useCurvesFrom);
     }
@@ -853,11 +893,14 @@ void SSurface::MakeClassifyingBsp(SShell *shell, SShell *useCurvesFrom) {
     SEdgeList el = {};
 
     MakeEdgesInto(shell, &el, MakeAs::UV, useCurvesFrom);
+    dump._Edges("MakeClassifyingBsp el", &el);
     bsp = SBspUv::From(&el, this);
+    dump._BspUv("bsp", bsp);
     el.Clear();
 
     edges = {};
     MakeEdgesInto(shell, &edges, MakeAs::XYZ, useCurvesFrom);
+    dump._Edges("MakeClassifyingBsp edges", &edges);
 }
 
 SBspUv *SBspUv::Alloc() {
@@ -865,6 +908,7 @@ SBspUv *SBspUv::Alloc() {
 }
 
 SBspUv *SBspUv::From(SEdgeList *el, SSurface *srf) {
+    dbp("BspUv.From Count=%d", el->l.n);
     SEdgeList work = {};
 
     SEdge *se;
@@ -879,6 +923,7 @@ SBspUv *SBspUv::From(SEdgeList *el, SSurface *srf) {
     });
     SBspUv *bsp = NULL;
     for(se = work.l.First(); se; se = work.l.NextAfter(se)) {
+        dump._Edge(" se", se);
         bsp = InsertOrCreateEdge(bsp, (se->a).ProjectXy(), (se->b).ProjectXy(), srf);
     }
 
