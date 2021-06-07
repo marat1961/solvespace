@@ -14,3 +14,6 @@
 /obj-*/
 /*.slvs
 .vscode/
+/src/.svn
+/out/build/x64-Debug (default)
+/.vs

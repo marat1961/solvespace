@@ -7,6 +7,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "../solvespace.h"
+#include "dbg.h"
 
 void SPolygon::UvTriangulateInto(SMesh *m, SSurface *srf) {
     if(l.n <= 0) return;
@@ -37,10 +38,12 @@ void SPolygon::UvTriangulateInto(SMesh *m, SSurface *srf) {
         top->tag = 1;
         top->CopyInto(&merged);
         merged.l.RemoveLast(1);
+        dump._Contour("  merged", &merged);
 
         // List all of the edges, for testing whether bridges work.
         SEdgeList el = {};
         top->MakeEdgesInto(&el);
+        dump._Edges("  el", &el);
         List<Vector> vl = {};
 
         // And now find all of its holes. Note that we will also find any
@@ -103,6 +106,7 @@ void SPolygon::UvTriangulateInto(SMesh *m, SSurface *srf) {
         }
         l.RemoveTagged();
     }
+    dump._Mesh("Polygon.UvTriangulateInto m", m);
 }
 
 bool SContour::BridgeToContour(SContour *sc,
@@ -132,7 +136,7 @@ bool SContour::BridgeToContour(SContour *sc,
             thiso = i;
         }
     }
-
+    dbp("BridgeToContour sco=%d thiso=%d", sco, thiso);
     int thisp, scp;
 
     Vector a, b, *f;
@@ -181,6 +185,7 @@ bool SContour::BridgeToContour(SContour *sc,
             if(avoidEdges->AnyEdgeCrossings(a, b) > 0) {
                 // doesn't work, bridge crosses an existing edge
             } else {
+                dbp("  haveEdge[%d, %d]", i, j);
                 goto haveEdge;
             }
         }
@@ -218,6 +223,7 @@ haveEdge:
 
     l.Clear();
     l = merged.l;
+    dump._Contour("  List", this);
     return true;
 }
 
@@ -340,6 +346,7 @@ bool SContour::IsEar(int bp, double scaledEps) const {
 }
 
 void SContour::ClipEarInto(SMesh *m, int bp, double scaledEps) {
+    dbp("  ClipEarInto bp=%d m.Cnt=%d", bp, m->l.n);
     int ap = WRAP(bp-1, l.n),
         cp = WRAP(bp+1, l.n);
 
@@ -351,6 +358,9 @@ void SContour::ClipEarInto(SMesh *m, int bp, double scaledEps) {
         // A vertex with more than two edges will cause us to generate
         // zero-area triangles, which must be culled.
     } else {
+        dump._Vector("  tr.a", &tr.a);
+        dump._Vector("  tr.b", &tr.b);
+        dump._Vector("  tr.c", &tr.c);
         m->AddTriangle(&tr);
     }
 
@@ -595,6 +605,8 @@ void SPolygon::UvGridTriangulateInto(SMesh *mesh, SSurface *srf) {
     srf->MakeTriangulationGridInto(&li, 0, 1, /*swapped=*/true, 0);
     lj.Add(&v[0]);
     srf->MakeTriangulationGridInto(&lj, 0, 1, /*swapped=*/false, 0);
+    dump._DoubleList("  li", &li);
+    dump._DoubleList("  lj", &lj);
 
     // force 2nd order grid to have at least 4 segments in each direction
     if ((li.n < 5) && (srf->degm>1)) { // 4 segments minimun

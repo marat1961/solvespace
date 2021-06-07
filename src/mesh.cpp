@@ -5,7 +5,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
-
+#include "dbg.h"
 #include <set>
 
 void SMesh::Clear() {
@@ -35,6 +35,10 @@ void SMesh::AddTriangle(STriMeta meta, Vector a, Vector b, Vector c) {
 }
 void SMesh::AddTriangle(const STriangle *st) {
     l.Add(st);
+    if (!dump.tr) return;
+    dump.trn++;
+    std::string s = ssprintf("  tr %d", dump.trn);
+    dump._Triangle(s.c_str(), st);
 }
 
 void SMesh::DoBounding(Vector v, Vector *vmax, Vector *vmin) const {
@@ -219,12 +223,17 @@ void SMesh::Simplify(int start) {
             double bDot = (ab.Cross(bc)).Dot(n);
             bDot /= min(ab.Magnitude(), bc.Magnitude());
 
-            if(bDot < 0) return; // XXX, shouldn't happen
+            if (bDot < 0) {
+                dbp("shouldn't happen");
+                return; // XXX, shouldn't happen
+            }
         }
 
         for(i = 0; i < convc - 2; i++) {
             STriangle tr = STriangle::From(meta, conv[0], conv[i+1], conv[i+2]);
             if(tr.MinAltitude() > LENGTH_EPS) {
+                std::string s = ssprintf("tout[%d]", toutc);
+                dump._Triangle(s.c_str(), &tr);
                 tout[toutc++] = tr;
             }
         }

@@ -6,6 +6,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
+#include "dbg.h"
 
 std::string Entity::DescriptionString() const {
     if(h.isFromRequest()) {
@@ -14,6 +15,38 @@ std::string Entity::DescriptionString() const {
     } else {
         Group *g = SK.GetGroup(h.group());
         return g->DescriptionString();
+    }
+}
+
+std::string Entity::TypeToString() const {
+    switch (type) {
+    case Type::POINT_IN_3D: return "Point3d";
+    case Type::POINT_IN_2D: return "Point2d";
+    case Type::POINT_N_TRANS: return "PointTrans";
+    case Type::POINT_N_ROT_TRANS: return "PointRotTrans";
+    case Type::POINT_N_COPY: return "PointCopy";
+    case Type::POINT_N_ROT_AA: return "PointRotAA";
+    case Type::NORMAL_IN_3D: return "Normal3d";
+    case Type::NORMAL_IN_2D: return "Normal2d";
+    case Type::NORMAL_N_COPY: return "NormalCopy";
+    case Type::NORMAL_N_ROT: return "NormalRot";
+    case Type::NORMAL_N_ROT_AA: return "NormalRotAA";
+    case Type::DISTANCE: return "Distance";
+    case Type::DISTANCE_N_COPY: return "DistanceCopy";
+    case Type::FACE_NORMAL_PT: return "FaceNormalPt";
+    case Type::FACE_XPROD: return "FaceXprod";
+    case Type::FACE_N_ROT_TRANS: return "FaceRotTrans";
+    case Type::FACE_N_TRANS: return "FaceTrans";
+    case Type::FACE_N_ROT_AA: return "FaceRotAA";
+    case Type::WORKPLANE: return "Workplane";
+    case Type::LINE_SEGMENT: return "LineSegment";
+    case Type::CUBIC: return "Cubic";
+    case Type::CUBIC_PERIODIC: return "CubicPeriodic";
+    case Type::CIRCLE: return "Circle";
+    case Type::ARC_OF_CIRCLE: return "Arc";
+    case Type::TTF_TEXT: return "Text";
+    case Type::IMAGE: return "Image";
+    default: return "Unexpected entity type";
     }
 }
 
@@ -371,19 +404,28 @@ void Entity::GenerateBezierCurves(SBezierList *sbl) const {
             Vector b = SK.GetEntity(point[1])->PointGetNum();
             sb = SBezier::From(a, b);
             sb.entity = h.v;
+            dbp("GenerateBezierCurves LINE_SEGMENT");
+            dump._Vector("  a", &a);
+            dump._Vector("  b", &b);
             sbl->l.Add(&sb);
             break;
         }
         case Type::CUBIC:
+            dbp("GenerateBezierCurves CUBIC");
             ComputeInterpolatingSpline(sbl, /*periodic=*/false);
             break;
 
         case Type::CUBIC_PERIODIC:
+            dbp("GenerateBezierCurves CUBIC_PERIODIC");
             ComputeInterpolatingSpline(sbl, /*periodic=*/true);
             break;
 
         case Type::CIRCLE:
         case Type::ARC_OF_CIRCLE: {
+            if(type == Type::CIRCLE)
+                dbp("GenerateBezierCurves CIRCLE");
+            else
+                dbp("GenerateBezierCurves ARC_OF_CIRCLE");
             Vector center = SK.GetEntity(point[0])->PointGetNum();
             Quaternion q = SK.GetEntity(normal)->NormalGetNum();
             Vector u = q.RotationU(), v = q.RotationV();
@@ -439,6 +481,7 @@ void Entity::GenerateBezierCurves(SBezierList *sbl) const {
 
                 SBezier sb = SBezier::From(p0, p1, p2);
                 sb.weight[1] = cos(dtheta/2);
+                dump._Bezier("  Bezier", &sb);
                 sbl->l.Add(&sb);
             }
             break;

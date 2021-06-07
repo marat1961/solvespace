@@ -6,6 +6,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
+#include "dbg.h"
 
 extern int FLAG;
 
@@ -116,8 +117,12 @@ void SSurface::IntersectAgainst(SSurface *b, SShell *agnstA, SShell *agnstB,
     Vector amax, amin, bmax, bmin;
     GetAxisAlignedBounding(&amax, &amin);
     b->GetAxisAlignedBounding(&bmax, &bmin);
-
-    if(Vector::BoundingBoxesDisjoint(amax, amin, bmax, bmin)) {
+    bool r = Vector::BoundingBoxesDisjoint(amax, amin, bmax, bmin);
+    dump._Vector("amax", &amax);
+    dump._Vector("amin", &amin);
+    dump._Vector("bmax", &bmax);
+    dump._Vector("bmin", &bmin);
+    if(r) {
         // They cannot possibly intersect, no curves to generate
         return;
     }
@@ -126,6 +131,11 @@ void SSurface::IntersectAgainst(SSurface *b, SShell *agnstA, SShell *agnstB,
     SBezier oft, ofb;
     bool isExtdt = this->IsExtrusion(&oft, &alongt),
          isExtdb =    b->IsExtrusion(&ofb, &alongb);
+    dbp("isExtdt=%d isExtdb=%d", isExtdt, isExtdb);
+    dump._Bezier("oft", &oft);
+    dump._Bezier("ofb", &ofb);
+    dump._Vector("alongt", &alongt);
+    dump._Vector("alongb", &alongb);
 
     if(degm == 1 && degn == 1 && b->degm == 1 && b->degn == 1) {
         // Line-line intersection; it's a plane or nothing.

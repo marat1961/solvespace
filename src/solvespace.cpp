@@ -6,6 +6,7 @@
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
 #include "config.h"
+#include "dbg.h"
 
 SolveSpaceUI SolveSpace::SS = {};
 Sketch SolveSpace::SK = {};
@@ -15,7 +16,8 @@ void SolveSpaceUI::Init() {
     // Check that the resource system works.
     dbp("%s", LoadString("banner.txt").data());
 #endif
-
+    dump.Init();
+    dbp("SS.Init");
     Platform::SettingsRef settings = Platform::GetSettings();
 
     SS.tangentArcRadius = 10.0;
@@ -152,6 +154,9 @@ void SolveSpaceUI::Init() {
         // Do this once the window is created.
         Request3DConnexionEventsForWindow(GW.window);
     }
+    std::string fn = "sdump.txt";
+    dump.Save(&fn, 0);
+    dump.Clear();
 }
 
 bool SolveSpaceUI::LoadAutosaveFor(const Platform::Path &filename) {
@@ -192,7 +197,11 @@ bool SolveSpaceUI::Load(const Platform::Path &filename) {
         saveFile.Clear();
         NewFile();
     }
+    dump.Clear();
     AfterNewFile();
+    std::string fn = "sdump2.txt";
+    dump.Save(&fn, 1);
+    dump.Clear();
     unsaved = autosaveLoaded;
     return fileLoaded;
 }
@@ -1063,7 +1072,10 @@ BBox Sketch::CalculateEntityBBox(bool includingInvisible) {
         }
     };
 
+    int i = 0;
     for(const Entity &e : entity) {
+        std::string s = ssprintf("  e[%d]", i++);
+        dump._Entity(s.c_str(), &e);
         if(e.construction) continue;
         if(!(includingInvisible || e.IsVisible())) continue;
 

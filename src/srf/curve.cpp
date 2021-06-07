@@ -5,6 +5,7 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "../solvespace.h"
+#include "../dbg.h"
 
 SBezier SBezier::From(Vector4 p0, Vector4 p1) {
     SBezier ret = {};
@@ -512,7 +513,9 @@ SBezierLoopSet SBezierLoopSet::From(SBezierList *sbl, SPolygon *poly,
         } else {
             ret.l.Add(&loop);
             poly->AddEmptyContour();
-            loop.MakePwlInto(poly->l.Last(), chordTol);
+            SContour *sc = poly->l.Last();
+            loop.MakePwlInto(sc, chordTol);
+            dump._Contour("BezierLoopSet.From Contour", sc);
         }
     }
 
@@ -523,7 +526,7 @@ SBezierLoopSet SBezierLoopSet::From(SBezierList *sbl, SPolygon *poly,
     } else {
         ret.point = Vector::From(0, 0, 0);
     }
-
+    dump._BezierLoopSet("BezierLoopSet.From", &ret);
     return ret;
 }
 
@@ -577,6 +580,7 @@ void SBezierLoopSetSet::FindOuterFacesFrom(SBezierList *sbl, SPolygon *spxyz,
                                    bool *allCoplanar, Vector *notCoplanarAt,
                                    SBezierLoopSet *openContours)
 {
+    dbp("FindOuterFacesFrom");
     SSurface srfPlane;
     if(!srfuv) {
         Vector p, u, v;
@@ -622,6 +626,7 @@ void SBezierLoopSetSet::FindOuterFacesFrom(SBezierList *sbl, SPolygon *spxyz,
         }
     }
     spuv.normal = Vector::From(0, 0, 1); // must be, since it's in xy plane now
+    dump._Polygon("  spuv", &spuv);
 
     static const int OUTER_LOOP = 10;
     static const int INNER_LOOP = 20;
@@ -690,8 +695,11 @@ void SBezierLoopSetSet::FindOuterFacesFrom(SBezierList *sbl, SPolygon *spxyz,
                 }
             }
 
+            dump._Surface("  Surface srfuv", srfuv);
             outerAndInners.point  = srfuv->PointAt(0, 0);
             outerAndInners.normal = srfuv->NormalAt(0, 0);
+            dump._Vector("  outerAndInners.normal", &outerAndInners.normal);
+            dump._Vector("  outerAndInners.point", &outerAndInners.point);
             l.Add(&outerAndInners);
         }
     }

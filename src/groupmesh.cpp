@@ -6,14 +6,17 @@
 // Copyright 2008-2013 Jonathan Westhues.
 //-----------------------------------------------------------------------------
 #include "solvespace.h"
+#include "dbg.h"
 
 void Group::AssembleLoops(bool *allClosed,
                           bool *allCoplanar,
                           bool *allNonZeroLen)
 {
+    dbp("AssembleLoops");
     SBezierList sbl = {};
 
     int i;
+    dbp("  SK.entity.Count=%d", SK.entity.n);
     for(auto &e : SK.entity) {
         if(e.group != h)
             continue;
@@ -24,7 +27,7 @@ void Group::AssembleLoops(bool *allClosed,
 
         e.GenerateBezierCurves(&sbl);
     }
-
+    dump._BezierList("  sbl", &sbl);
     SBezier *sb;
     *allNonZeroLen = true;
     for(sb = sbl.l.First(); sb; sb = sbl.l.NextAfter(sb)) {
@@ -229,6 +232,7 @@ void Group::GenerateShellAndMesh() {
     }
 
     if(type == Type::TRANSLATE || type == Type::ROTATE) {
+        dbp("Group.GenerateShellAndMesh TRANSLATE or ROTATE");
         // A step and repeat gets merged against the group's previous group,
         // not our own previous group.
         srcg = SK.GetGroup(opA);
@@ -244,6 +248,7 @@ void Group::GenerateShellAndMesh() {
             }
         }
     } else if(type == Type::EXTRUDE && haveSrc) {
+        dbp("Group.GenerateShellAndMesh EXTRUDE");
         Group *src = SK.GetGroup(opA);
         Vector translate = Vector::From(h.param(0), h.param(1), h.param(2));
 
@@ -253,6 +258,9 @@ void Group::GenerateShellAndMesh() {
         } else {
             tbot = translate.ScaledBy(-1); ttop = translate.ScaledBy(1);
         }
+        dump._Vector("  translate", &translate);
+        dump._Vector("  tbot", &tbot);
+        dump._Vector("  ttop", &ttop);
 
         SBezierLoopSetSet *sblss = &(src->bezierLoops);
         SBezierLoopSet *sbls;
@@ -313,6 +321,7 @@ void Group::GenerateShellAndMesh() {
             }
         }
     } else if(type == Type::LATHE && haveSrc) {
+        dbp("Group.GenerateShellAndMesh LATHE");
         Group *src = SK.GetGroup(opA);
 
         Vector pt   = SK.GetEntity(predef.origin)->PointGetNum(),
@@ -389,6 +398,7 @@ void Group::GenerateShellAndMesh() {
         thisShell.RemapFaces(this, 0);
     }
 
+    dbp("Group.Merge");
     if(srcg->meshCombine != CombineAs::ASSEMBLE) {
         thisShell.MergeCoincidentSurfaces();
     }
@@ -403,6 +413,9 @@ void Group::GenerateShellAndMesh() {
         SShell *prevs = &(prevg->runningShell);
         GenerateForBoolean<SShell>(prevs, &thisShell, &runningShell,
             srcg->meshCombine);
+        std::string name = ssprintf("Group.GenerateForBoolean %s",
+                                    dump._GroupCombine(srcg->meshCombine));
+        dump._Shell(name.c_str(), &runningShell);
 
         if(srcg->meshCombine != CombineAs::ASSEMBLE) {
             runningShell.MergeCoincidentSurfaces();
